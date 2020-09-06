@@ -1,8 +1,7 @@
 ﻿using BooruSharp.Booru;
+using BooruSharp.Extensions;
 using BooruSharp.Search;
 using BooruSharp.Search.Post;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,6 +9,7 @@ using System.Net;
 using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace BooruSharp.Others
@@ -79,12 +79,15 @@ namespace BooruSharp.Others
 
             response.EnsureSuccessStatusCode();
 
-            var jsonToken = JsonConvert.DeserializeObject<JToken>(await response.Content.ReadAsStringAsync());
-            var responseToken = jsonToken["response"];
+            using (var stream = await response.Content.ReadAsStreamAsync())
+            using (var document = await JsonDocument.ParseAsync(stream))
+            {
+                var responseElement = document.RootElement.GetProperty("response");
 
-            AccessToken = responseToken["access_token"].Value<string>();
-            RefreshToken = responseToken["refresh_token"].Value<string>();
-            _refreshTime = DateTime.Now.AddSeconds(responseToken["expires_in"].Value<int>());
+                AccessToken = responseElement.GetString("access_token");
+                RefreshToken = responseElement.GetString("refresh_token");
+                _refreshTime = DateTime.Now.AddSeconds(responseElement.GetInt32("expires_in").Value);
+            }
         }
 
         /// <summary>
@@ -168,11 +171,14 @@ namespace BooruSharp.Others
 
             response.EnsureSuccessStatusCode();
 
-            var jsonToken = JsonConvert.DeserializeObject<JToken>(await response.Content.ReadAsStringAsync());
-            var responseToken = jsonToken["response"];
+            using (var stream = await response.Content.ReadAsStreamAsync())
+            using (var document = await JsonDocument.ParseAsync(stream))
+            {
+                var responseElement = document.RootElement.GetProperty("response");
 
-            AccessToken = responseToken["access_token"].Value<string>();
-            _refreshTime = DateTime.Now.AddSeconds(responseToken["expires_in"].Value<int>());
+                AccessToken = responseElement.GetString("access_token");
+                _refreshTime = DateTime.Now.AddSeconds(responseElement.GetInt32("expires_in").Value);
+            }
         }
 
         /// <inheritdoc/>
@@ -255,8 +261,14 @@ namespace BooruSharp.Others
 
             response.EnsureSuccessStatusCode();
 
-            var jsonToken = JsonConvert.DeserializeObject<JToken>(await response.Content.ReadAsStringAsync());
-            return ParseSearchResult(jsonToken["illust"]);
+            //var jsonToken = JsonConvert.DeserializeObject<JToken>(await response.Content.ReadAsStringAsync());
+            //return ParseSearchResult(jsonToken["illust"]);
+
+            using (var stream = await response.Content.ReadAsStreamAsync())
+            using (var document = await JsonDocument.ParseAsync(stream))
+            {
+                return ParseSearchResult(document.RootElement.GetProperty("illust"));
+            }
         }
 
         /// <inheritdoc/>
@@ -282,9 +294,13 @@ namespace BooruSharp.Others
 
             response.EnsureSuccessStatusCode();
 
-            var jsonToken = JsonConvert.DeserializeObject<JToken>(await response.Content.ReadAsStringAsync());
-            var jsonArray = (JArray)jsonToken["illusts"];
-            return ParseSearchResult(jsonArray[0]);
+            using (var stream = await response.Content.ReadAsStreamAsync())
+            using (var document = await JsonDocument.ParseAsync(stream))
+            {
+                var element = document.RootElement.GetProperty("illusts");
+                return ParseSearchResult(element.EnumerateArray().First());
+            }
+
         }
 
         /// <inheritdoc/>
@@ -308,8 +324,14 @@ namespace BooruSharp.Others
 
             response.EnsureSuccessStatusCode();
 
-            var jsonToken = JsonConvert.DeserializeObject<JToken>(await response.Content.ReadAsStringAsync());
-            return jsonToken["body"]["illustManga"]["total"].Value<int>();
+            using (var stream = await response.Content.ReadAsStreamAsync())
+            using (var document = await JsonDocument.ParseAsync(stream))
+            {
+                return document.RootElement
+                    .GetProperty("body")
+                    .GetProperty("illustManga")
+                    .GetInt32("total").Value;
+            }
         }
 
         /// <inheritdoc/>
@@ -338,8 +360,11 @@ namespace BooruSharp.Others
 
             response.EnsureSuccessStatusCode();
 
-            var jsonToken = JsonConvert.DeserializeObject<JToken>(await response.Content.ReadAsStringAsync());
-            return ParseSearchResults((JArray)jsonToken["illusts"]);
+            using (var stream = await response.Content.ReadAsStreamAsync())
+            using (var document = await JsonDocument.ParseAsync(stream))
+            {
+                return ParseSearchResults(document.RootElement);
+            }
         }
 
         private static string JoinTagsAndEscapeString(string[] tags)
@@ -348,14 +373,14 @@ namespace BooruSharp.Others
             return Uri.EscapeDataString(joined);
         }
 
-        private SearchResult[] ParseSearchResults(JArray array)
+        private SearchResult[] ParseSearchResults(in JsonElement element)
         {
-            return array.Select(ParseSearchResult).ToArray();
+            return element.Select(e => ParseSearchResult(e)).ToArray();
         }
 
-        private SearchResult ParseSearchResult(JToken post)
+        private SearchResult ParseSearchResult(in JsonElement post)
         {
-            var tags = post["tags"].Select(x => x["name"].Value<string>()).ToList();
+            var tags = post.GetProperty("tags").Select(e => e.GetString("name")).ToList();
 
             bool isNsfw = tags.Contains("R-18");
             if (isNsfw)
@@ -363,29 +388,45 @@ namespace BooruSharp.Others
                 tags.Remove("R-18");
             }
 
-            var originalImageUrlToken =
-                 // If there's multiple image URLs, get the first one.
-                 (post["meta_pages"]?.FirstOrDefault()?["image_urls"]?["original"])
-                 // If there's only one original image URL, use that one.
-                 ?? (post["meta_single_page"]?["original_image_url"])
-                 // Fallback to large image in case neither of the above succeeds.
-                 ?? (post["image_urls"]["large"]);
+            JsonElement originalImageElement;
+
+            // If there's multiple image URLs, get the first one.
+            if (post.TryGetProperty("meta_pages", out var tempElement)
+                && tempElement.GetArrayLength() > 0
+                && tempElement.EnumerateArray().First().TryGetProperty("image_urls", out tempElement)
+                && tempElement.TryGetProperty("original", out tempElement))
+            {
+                originalImageElement = tempElement;
+            }
+            // If there's only one original image URL, use that one.
+            else if (post.TryGetProperty("meta_single_page", out tempElement)
+                && tempElement.TryGetProperty("original_image_url", out tempElement))
+            {
+                originalImageElement = tempElement;
+            }
+            // Fallback to large image in case neither of the above succeeds.
+            else
+            {
+                originalImageElement = post.GetProperty("image_urls").GetProperty("large");
+            }
+
+            var id = post.GetInt32("id").Value;
 
             return new SearchResult(
-                new Uri(originalImageUrlToken.Value<string>()),
-                new Uri(post["image_urls"]["medium"].Value<string>()),
-                new Uri("https://www.pixiv.net/en/artworks/" + post["id"].Value<int>()),
+                new Uri(originalImageElement.GetString()),
+                post.GetProperty("image_urls").GetUri("medium"),
+                new Uri("https://www.pixiv.net/en/artworks/" + id),
                 isNsfw ? Rating.Explicit : Rating.Safe,
                 tags,
-                post["id"].Value<int>(),
+                id,
                 null,
-                post["height"].Value<int>(),
-                post["width"].Value<int>(),
+                post.GetInt32("height").Value,
+                post.GetInt32("width").Value,
                 null,
                 null,
-                post["create_date"].Value<DateTime>(),
+                post.GetDateTime("create_date").Value,
                 null,
-                post["total_bookmarks"].Value<int>(),
+                post.GetInt32("total_bookmarks"),
                 null);
         }
 
