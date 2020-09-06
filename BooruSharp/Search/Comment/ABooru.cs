@@ -1,7 +1,7 @@
-﻿using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
+﻿using BooruSharp.Extensions;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace BooruSharp.Booru
@@ -37,14 +37,17 @@ namespace BooruSharp.Booru
             }
             else
             {
-                var jsonArray = JsonConvert.DeserializeObject<JArray>(await GetJsonAsync(url));
-
-                foreach (var json in jsonArray)
+                using (var content = await GetResponseContentAsync(url))
+                using (var stream = await content.ReadAsStreamAsync())
+                using (var document = await JsonDocument.ParseAsync(stream))
                 {
-                    var result = GetCommentSearchResult(json);
+                    foreach (var element in document.RootElement.EnumerateArray())
+                    {
+                        var result = GetCommentSearchResult(element);
 
-                    if (result.PostID == postId)
-                        results.Add(result);
+                        if (result.PostID == postId)
+                            results.Add(result);
+                    }
                 }
             }
 
@@ -76,8 +79,12 @@ namespace BooruSharp.Booru
             }
             else
             {
-                var jsonArray = JsonConvert.DeserializeObject<JArray>(await GetJsonAsync(url));
-                return jsonArray.Select(GetCommentSearchResult).ToArray();
+                using (var content = await GetResponseContentAsync(url))
+                using (var stream = await content.ReadAsStreamAsync())
+                using (var document = await JsonDocument.ParseAsync(stream))
+                {
+                    return document.RootElement.Select(e => GetCommentSearchResult(e)).ToArray();
+                }
             }
         }
     }

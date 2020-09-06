@@ -1,6 +1,6 @@
-﻿using Newtonsoft.Json;
-using System;
+﻿using System;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 using System.Xml;
 
@@ -166,12 +166,24 @@ namespace BooruSharp.Booru
         /// <exception cref="System.Net.Http.HttpRequestException"/>
         public virtual async Task<Search.Post.SearchResult[]> GetLastPostsAsync(params string[] tagsArg)
         {
-            return GetPostsSearchResult(JsonConvert.DeserializeObject(await GetJsonAsync(CreateUrl(_imageUrl, TagsToString(tagsArg)))));
+            var url = CreateUrl(_imageUrl, TagsToString(tagsArg));
+
+            using (var content = await GetResponseContentAsync(url))
+            using (var stream = await content.ReadAsStreamAsync())
+            using (var document = await JsonDocument.ParseAsync(stream))
+            {
+                return GetPostsSearchResult(document.RootElement);
+            }
         }
 
         private async Task<Search.Post.SearchResult> GetSearchResultFromUrlAsync(string url)
         {
-            return GetPostSearchResult(ParseFirstPostSearchResult(JsonConvert.DeserializeObject(await GetJsonAsync(url))));
+            using (var content = await GetResponseContentAsync(url))
+            using (var stream = await content.ReadAsStreamAsync())
+            using (var document = await JsonDocument.ParseAsync(stream))
+            {
+                return GetPostSearchResult(ParseFirstPostSearchResult(document.RootElement));
+            }
         }
 
         private Task<Search.Post.SearchResult> GetSearchResultFromUrlAsync(Uri url)
@@ -181,7 +193,12 @@ namespace BooruSharp.Booru
 
         private async Task<Search.Post.SearchResult[]> GetSearchResultsFromUrlAsync(string url)
         {
-            return GetPostsSearchResult(JsonConvert.DeserializeObject(await GetJsonAsync(url)));
+            using (var content = await GetResponseContentAsync(url))
+            using (var stream = await content.ReadAsStreamAsync())
+            using (var document = await JsonDocument.ParseAsync(stream))
+            {
+                return GetPostsSearchResult(document.RootElement);
+            }
         }
 
         private Task<Search.Post.SearchResult[]> GetSearchResultsFromUrlAsync(Uri url)

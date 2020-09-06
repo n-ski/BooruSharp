@@ -1,7 +1,8 @@
-﻿using Newtonsoft.Json.Linq;
+﻿using BooruSharp.Extensions;
 using System;
 using System.Globalization;
 using System.Linq;
+using System.Text.Json;
 using System.Xml;
 
 namespace BooruSharp.Booru.Template
@@ -28,42 +29,42 @@ namespace BooruSharp.Booru.Template
             _url = domain;
         }
 
-        private protected override JToken ParseFirstPostSearchResult(object json)
+        private protected override JsonElement ParseFirstPostSearchResult(in JsonElement element)
         {
-            JArray array = json as JArray;
-            return array?.FirstOrDefault() ?? throw new Search.InvalidTags();
+            return element.ValueKind == JsonValueKind.Array && element.GetArrayLength() > 0
+                ? element.EnumerateArray().First()
+                : throw new Search.InvalidTags();
         }
 
-        private protected override Search.Post.SearchResult GetPostSearchResult(JToken elem)
+        private protected override Search.Post.SearchResult GetPostSearchResult(in JsonElement element)
         {
-            string baseUrl = BaseUrl.Scheme + "://" + _url;
-            string directory = elem["directory"].Value<string>();
-            string image = elem["image"].Value<string>();
-            int id = elem["id"].Value<int>();
+            var baseUrl = BaseUrl.Scheme + "://" + _url;
+            var directory = element.GetString("directory");
+            var image = element.GetString("image");
+            var id = element.GetInt32("id").Value;
 
             return new Search.Post.SearchResult(
                 new Uri(baseUrl + "//images/" + directory + "/" + image),
                 new Uri(baseUrl + "//thumbnails/" + directory + "/thumbnails_" + image),
                 new Uri(BaseUrl + "index.php?page=post&s=view&id=" + id),
-                GetRating(elem["rating"].Value<string>()[0]),
-                elem["tags"].Value<string>().Split(' '),
+                GetRating(element.GetString("rating")[0]),
+                element.GetString("tags").Split(' '),
                 id,
                 null,
-                elem["height"].Value<int>(),
-                elem["width"].Value<int>(),
+                element.GetInt32("height").Value,
+                element.GetInt32("width").Value,
                 null,
                 null,
                 null,
                 null,
-                elem["score"].Value<int?>(),
-                null
-                );
+                element.GetInt32("score"),
+                null);
         }
 
-        private protected override Search.Post.SearchResult[] GetPostsSearchResult(object json)
+        private protected override Search.Post.SearchResult[] GetPostsSearchResult(in JsonElement element)
         {
-            return json is JArray array 
-                ? array.Select(GetPostSearchResult).ToArray()
+            return element.ValueKind == JsonValueKind.Array && element.GetArrayLength() > 0
+                ? element.Select(e => GetPostSearchResult(e)).ToArray()
                 : Array.Empty<Search.Post.SearchResult>();
         }
 
@@ -71,14 +72,14 @@ namespace BooruSharp.Booru.Template
         {
             var elem = (XmlNode)json;
             XmlNode creatorId = elem.Attributes.GetNamedItem("creator_id");
+
             return new Search.Comment.SearchResult(
                 int.Parse(elem.Attributes.GetNamedItem("id").Value),
                 int.Parse(elem.Attributes.GetNamedItem("post_id").Value),
                 creatorId.InnerText.Length > 0 ? int.Parse(creatorId.Value) : (int?)null,
                 DateTime.ParseExact(elem.Attributes.GetNamedItem("created_at").Value, "yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture),
                 elem.Attributes.GetNamedItem("creator").Value,
-                elem.Attributes.GetNamedItem("body").Value
-                );
+                elem.Attributes.GetNamedItem("body").Value);
         }
 
         // GetWikiSearchResult not available
@@ -86,12 +87,12 @@ namespace BooruSharp.Booru.Template
         private protected override Search.Tag.SearchResult GetTagSearchResult(object json)
         {
             var elem = (XmlNode)json;
+
             return new Search.Tag.SearchResult(
                 int.Parse(elem.Attributes.GetNamedItem("id").Value),
                 elem.Attributes.GetNamedItem("name").Value,
                 (Search.Tag.TagType)int.Parse(elem.Attributes.GetNamedItem("type").Value),
-                int.Parse(elem.Attributes.GetNamedItem("count").Value)
-                );
+                int.Parse(elem.Attributes.GetNamedItem("count").Value));
         }
 
         // GetRelatedSearchResult not available

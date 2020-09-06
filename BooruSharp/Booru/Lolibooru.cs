@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json.Linq;
+﻿using BooruSharp.Extensions;
+using System.Text.Json;
 
 namespace BooruSharp.Booru
 {
@@ -18,15 +19,13 @@ namespace BooruSharp.Booru
         /// <inheritdoc/>
         public override bool IsSafe => false;
 
-        private protected override Search.Tag.SearchResult GetTagSearchResult(object json)
+        private protected override Search.Tag.SearchResult GetTagSearchResult(in JsonElement element)
         {
-            var elem = (JObject)json;
             return new Search.Tag.SearchResult(
-                elem["id"].Value<int>(),
-                elem["name"].Value<string>(),
-                (Search.Tag.TagType)elem["tag_type"].Value<int>(),
-                elem["post_count"].Value<int>()
-                );
+                element.GetInt32("id").Value,
+                element.GetString("name"),
+                (Search.Tag.TagType)element.GetInt32("tag_type").Value,
+                element.GetInt32("post_count").Value);
         }
     }
 }

@@ -1,7 +1,7 @@
-﻿using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
+﻿using BooruSharp.Extensions;
 using System;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace BooruSharp.Booru
@@ -25,15 +25,18 @@ namespace BooruSharp.Booru
                 throw new ArgumentNullException(nameof(tag));
 
             bool isDanbooruFormat = _format == UrlFormat.Danbooru;
+            var url = CreateUrl(_relatedUrl, (isDanbooruFormat ? "query" : "tags") + "=" + tag);
 
-            var content = JsonConvert.DeserializeObject<JObject>(
-                await GetJsonAsync(CreateUrl(_relatedUrl, (isDanbooruFormat ? "query" : "tags") + "=" + tag)));
+            using (var content = await GetResponseContentAsync(url))
+            using (var stream = await content.ReadAsStreamAsync())
+            using (var document = await JsonDocument.ParseAsync(stream))
+            {
+                var element = isDanbooruFormat
+                    ? document.RootElement.GetProperty("tags")
+                    : document.RootElement.GetProperty(document.RootElement.EnumerateObject().First().Name);
 
-            var jsonArray = (JArray)(isDanbooruFormat
-                ? content["tags"]
-                : content[content.Properties().First().Name]);
-
-            return jsonArray.Select(GetRelatedSearchResult).ToArray();
+                return element.Select(e => GetRelatedSearchResult(e)).ToArray();
+            }
         }
     }
 }

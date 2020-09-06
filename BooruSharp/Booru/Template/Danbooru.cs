@@ -1,6 +1,7 @@
-﻿using Newtonsoft.Json.Linq;
+﻿using BooruSharp.Extensions;
 using System;
 using System.Linq;
+using System.Text.Json;
 
 namespace BooruSharp.Booru.Template
 {
@@ -24,94 +25,95 @@ namespace BooruSharp.Booru.Template
                   | BooruOptions.NoFavorite)
         { }
 
-        private protected override JToken ParseFirstPostSearchResult(object json)
+        private protected override JsonElement ParseFirstPostSearchResult(in JsonElement element)
         {
-            JToken token = json is JArray array
-                ? array.FirstOrDefault()
-                : json as JToken;
+            switch (element.ValueKind)
+            {
+                case JsonValueKind.Array:
+                    return element.EnumerateArray().First();
 
-            return token ?? throw new Search.InvalidTags();
+                case JsonValueKind.Object:
+                    return element;
+
+                default:
+                    throw new Search.InvalidTags();
+            }
         }
 
-        private protected override Search.Post.SearchResult GetPostSearchResult(JToken elem)
+        private protected override Search.Post.SearchResult GetPostSearchResult(in JsonElement element)
         {
-            var url = elem["file_url"];
-            var previewUrl = elem["preview_file_url"];
-            var id = elem["id"]?.Value<int>();
-            var md5 = elem["md5"];
+            var id = element.GetInt32("id").Value;
 
             return new Search.Post.SearchResult(
-                    url != null ? new Uri(url.Value<string>()) : null,
-                    previewUrl != null ? new Uri(previewUrl.Value<string>()) : null,
-                    id.HasValue ? new Uri(BaseUrl + "posts/" + id.Value) : null,
-                    GetRating(elem["rating"].Value<string>()[0]),
-                    elem["tag_string"].Value<string>().Split(' '),
-                    id ?? 0,
-                    elem["file_size"].Value<int>(),
-                    elem["image_height"].Value<int>(),
-                    elem["image_width"].Value<int>(),
-                    null,
-                    null,
-                    elem["created_at"].Value<DateTime>(),
-                    elem["source"].Value<string>(),
-                    elem["score"].Value<int>(),
-                    md5?.Value<string>()
-                );
+                element.GetUri("file_url"),
+                element.GetUri("preview_file_url"),
+                new Uri(BaseUrl + "posts/" + id),
+                GetRating(element.GetString("rating")[0]),
+                element.GetString("tag_string").Split(' '),
+                id,
+                element.GetInt32("file_size"),
+                element.GetInt32("image_height").Value,
+                element.GetInt32("image_width").Value,
+                null,
+                null,
+                element.GetDateTime("created_at"),
+                element.GetString("source"),
+                element.GetInt32("score"),
+                element.GetString("md5"));
         }
 
-        private protected override Search.Post.SearchResult[] GetPostsSearchResult(object json)
+        private protected override Search.Post.SearchResult[] GetPostsSearchResult(in JsonElement element)
         {
-            if (json is JArray array)
-                return array.Select(GetPostSearchResult).ToArray();
-            else if (json is JToken token && token["post"] is JToken post)
-                return new[] { GetPostSearchResult(post) };
-            else
-                return Array.Empty<Search.Post.SearchResult>();
+            switch (element.ValueKind)
+            {
+                case JsonValueKind.Array when element.GetArrayLength() > 0:
+                    return element.Select(e => GetPostSearchResult(e)).ToArray();
+
+                case JsonValueKind.Object when element.TryGetProperty("post", out var post):
+                    return new[] { GetPostSearchResult(post) };
+
+                default:
+                    return Array.Empty<Search.Post.SearchResult>();
+            }
         }
 
-        private protected override Search.Comment.SearchResult GetCommentSearchResult(object json)
+        private protected override Search.Comment.SearchResult GetCommentSearchResult(in JsonElement element)
         {
-            var elem = (JObject)json;
             return new Search.Comment.SearchResult(
-                elem["id"].Value<int>(),
-                elem["post_id"].Value<int>(),
-                elem["creator_id"].Value<int?>(),
-                elem["created_at"].Value<DateTime>(),
-                elem["creator_name"]?.Value<string>(),
-                elem["body"].Value<string>()
-                );
+                element.GetInt32("id").Value,
+                element.GetInt32("post_id").Value,
+                element.GetInt32("creator_id"),
+                element.GetDateTime("created_at").Value,
+                element.GetString("creator_name"),
+                element.GetString("body"));
         }
 
-        private protected override Search.Wiki.SearchResult GetWikiSearchResult(object json)
+        private protected override Search.Wiki.SearchResult GetWikiSearchResult(in JsonElement element)
         {
-            var elem = (JObject)json;
             return new Search.Wiki.SearchResult(
-                elem["id"].Value<int>(),
-                elem["title"].Value<string>(),
-                elem["created_at"].Value<DateTime>(),
-                elem["updated_at"].Value<DateTime>(),
-                elem["body"].Value<string>()
-                );
+                element.GetInt32("id").Value,
+                element.GetString("title"),
+                element.GetDateTime("created_at").Value,
+                element.GetDateTime("updated_at").Value,
+                element.GetString("body"));
         }
 
-        private protected override Search.Tag.SearchResult GetTagSearchResult(object json)
+        private protected override Search.Tag.SearchResult GetTagSearchResult(in JsonElement element)
         {
-            var elem = (JObject)json;
             return new Search.Tag.SearchResult(
-                elem["id"].Value<int>(),
-                elem["name"].Value<string>(),
-                (Search.Tag.TagType)elem["category"].Value<int>(),
-                elem["post_count"].Value<int>()
-                );
+                element.GetInt32("id").Value,
+                element.GetString("name"),
+                (Search.Tag.TagType)element.GetInt32("category").Value,
+                element.GetInt32("post_count").Value);
         }
 
-        private protected override Search.Related.SearchResult GetRelatedSearchResult(object json)
+        private protected override Search.Related.SearchResult GetRelatedSearchResult(in JsonElement element)
         {
-            var elem = (JArray)json;
+            var childElements = element.EnumerateArray().Take(2).ToArray();
+
             return new Search.Related.SearchResult(
-                elem[0].Value<string>(),
-                elem[1].Value<int>()
-                );
+                childElements[0].GetString(),
+                childElements[1].GetInt32());
         }
     }
 }

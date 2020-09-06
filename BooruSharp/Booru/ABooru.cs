@@ -1,9 +1,9 @@
 ﻿using BooruSharp.Search;
-using Newtonsoft.Json.Linq;
 using System;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Text.Json;
 using System.Threading.Tasks;
 using System.Web;
 using System.Xml;
@@ -21,25 +21,40 @@ namespace BooruSharp.Booru
         /// </summary>
         public abstract bool IsSafe { get; }
 
-        private protected virtual Search.Comment.SearchResult GetCommentSearchResult(object json)
+        private protected virtual Search.Comment.SearchResult GetCommentSearchResult(object obj)
             => throw new FeatureUnavailable();
 
-        private protected virtual Search.Post.SearchResult GetPostSearchResult(JToken obj)
+        private protected virtual Search.Comment.SearchResult GetCommentSearchResult(in JsonElement element)
             => throw new FeatureUnavailable();
 
-        private protected virtual Search.Post.SearchResult[] GetPostsSearchResult(object json)
+        private protected virtual Search.Post.SearchResult GetPostSearchResult(in JsonElement element)
             => throw new FeatureUnavailable();
 
-        private protected virtual JToken ParseFirstPostSearchResult(object json)
+        private protected virtual Search.Post.SearchResult[] GetPostsSearchResult(object obj)
             => throw new FeatureUnavailable();
 
-        private protected virtual Search.Related.SearchResult GetRelatedSearchResult(object json)
+        private protected virtual Search.Post.SearchResult[] GetPostsSearchResult(in JsonElement element)
             => throw new FeatureUnavailable();
 
-        private protected virtual Search.Tag.SearchResult GetTagSearchResult(object json)
+        private protected virtual JsonElement ParseFirstPostSearchResult(in JsonElement element)
             => throw new FeatureUnavailable();
 
-        private protected virtual Search.Wiki.SearchResult GetWikiSearchResult(object json)
+        private protected virtual Search.Related.SearchResult GetRelatedSearchResult(object obj)
+            => throw new FeatureUnavailable();
+
+        private protected virtual Search.Related.SearchResult GetRelatedSearchResult(in JsonElement element)
+            => throw new FeatureUnavailable();
+
+        private protected virtual Search.Tag.SearchResult GetTagSearchResult(object obj)
+            => throw new FeatureUnavailable();
+
+        private protected virtual Search.Tag.SearchResult GetTagSearchResult(in JsonElement element)
+            => throw new FeatureUnavailable();
+
+        private protected virtual Search.Wiki.SearchResult GetWikiSearchResult(object obj)
+            => throw new FeatureUnavailable();
+
+        private protected virtual Search.Wiki.SearchResult GetWikiSearchResult(in JsonElement element)
             => throw new FeatureUnavailable();
 
         /// <summary>
@@ -208,10 +223,11 @@ namespace BooruSharp.Booru
 
         // TODO: Handle limitrate
 
-        private async Task<string> GetJsonAsync(string url)
+        [Obsolete]
+        private async Task<string> GetResponseStringAsync(string url)
         {
             ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
-            HttpResponseMessage msg = await HttpClient.GetAsync(url);
+            HttpResponseMessage msg = await HttpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
 
             if (msg.StatusCode == HttpStatusCode.Forbidden)
                 throw new AuthentificationRequired();
@@ -221,17 +237,34 @@ namespace BooruSharp.Booru
             return await msg.Content.ReadAsStringAsync();
         }
 
-        private Task<string> GetJsonAsync(Uri url)
+        private async Task<HttpContent> GetResponseContentAsync(string url)
         {
-            return GetJsonAsync(url.AbsoluteUri);
+            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
+            HttpResponseMessage msg = await HttpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+
+            if (msg.StatusCode == HttpStatusCode.Forbidden)
+                throw new AuthentificationRequired();
+
+            msg.EnsureSuccessStatusCode();
+
+            return msg.Content;
+        }
+
+        private Task<HttpContent> GetResponseContentAsync(Uri url)
+        {
+            return GetResponseContentAsync(url.AbsoluteUri);
         }
 
         private async Task<XmlDocument> GetXmlAsync(string url)
         {
-            var xmlDoc = new XmlDocument();
-            var xmlString = await GetJsonAsync(url);
-            xmlDoc.LoadXml(XmlEntity.ReplaceAll(xmlString));
-            return xmlDoc;
+            using (var response = await GetResponseContentAsync(url))
+            {
+                var xmlDoc = new XmlDocument();
+                var xmlString = await response.ReadAsStringAsync();
+                xmlDoc.LoadXml(XmlEntity.ReplaceAll(xmlString));
+
+                return xmlDoc;
+            }
         }
 
         private Task<XmlDocument> GetXmlAsync(Uri url)

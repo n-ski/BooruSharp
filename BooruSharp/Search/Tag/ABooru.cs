@@ -1,9 +1,9 @@
-﻿using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
+﻿using BooruSharp.Extensions;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace BooruSharp.Booru
@@ -84,8 +84,12 @@ namespace BooruSharp.Booru
             }
             else
             {
-                var jsonArray = JsonConvert.DeserializeObject<JArray>(await GetJsonAsync(url));
-                return jsonArray.Select(GetTagSearchResult).ToArray();
+                using (var content = await GetResponseContentAsync(url))
+                using (var stream = await content.ReadAsStreamAsync())
+                using (var document = await JsonDocument.ParseAsync(stream))
+                {
+                    return document.RootElement.Select(e => GetTagSearchResult(e)).ToArray();
+                }
             }
         }
 
@@ -110,12 +114,22 @@ namespace BooruSharp.Booru
             }
             else
             {
-                enumerable = JsonConvert.DeserializeObject<JArray>(await GetJsonAsync(url));
+                using (var content = await GetResponseContentAsync(url))
+                using (var stream = await content.ReadAsStreamAsync())
+                using (var document = await JsonDocument.ParseAsync(stream))
+                {
+                    enumerable = document.RootElement.Clone().EnumerateArray();
+                }
             }
 
             foreach (object item in enumerable)
             {
-                var result = GetTagSearchResult(item);
+                Search.Tag.SearchResult result;
+
+                if (item is JsonElement jsonElement)
+                    result = GetTagSearchResult(jsonElement);
+                else
+                    result = GetTagSearchResult(item);
 
                 if ((name == null && id == result.ID) || (name != null && name == result.Name))
                     return result;

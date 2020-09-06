@@ -1,8 +1,9 @@
-﻿using Newtonsoft.Json.Linq;
+﻿using BooruSharp.Extensions;
 using System;
 using System.Globalization;
 using System.Linq;
 using System.Net.Http;
+using System.Text.Json;
 using System.Threading.Tasks;
 using System.Web;
 using System.Xml;
@@ -55,43 +56,43 @@ namespace BooruSharp.Booru.Template
             }
         }
 
-        private protected override JToken ParseFirstPostSearchResult(object json)
+        private protected override JsonElement ParseFirstPostSearchResult(in JsonElement element)
         {
-            JArray array = json as JArray;
-            return array?.FirstOrDefault() ?? throw new Search.InvalidTags();
+            return element.ValueKind == JsonValueKind.Array && element.GetArrayLength() > 0
+                ? element.EnumerateArray().First()
+                : throw new Search.InvalidTags();
         }
 
-        private protected override Search.Post.SearchResult GetPostSearchResult(JToken elem)
+        private protected override Search.Post.SearchResult GetPostSearchResult(in JsonElement element)
         {
             const string gelbooruTimeFormat = "ddd MMM dd HH:mm:ss zzz yyyy";
 
-            string directory = elem["directory"].Value<string>();
-            string image = elem["image"].Value<string>();
-            int id = elem["id"].Value<int>();
+            var directory = element.GetString("directory");
+            var image = element.GetString("image");
+            var id = element.GetInt32("id").Value;
 
             return new Search.Post.SearchResult(
-                new Uri(elem["file_url"].Value<string>()),
+                element.GetUri("file_url"),
                 new Uri("https://gelbooru.com/thumbnails/" + directory + "/thumbnail_" + image),
-                new Uri(BaseUrl + "index.php?page=post&s=view&id=" + id),
-                GetRating(elem["rating"].Value<string>()[0]),
-                elem["tags"].Value<string>().Split(' '),
+                new Uri(BaseUrl + "/index.php?page=post&s=view&id=" + id),
+                GetRating(element.GetString("rating")[0]),
+                element.GetString("tags").Split(' '),
                 id,
                 null,
-                elem["height"].Value<int>(),
-                elem["width"].Value<int>(),
+                element.GetInt32("height").Value,
+                element.GetInt32("width").Value,
                 null,
                 null,
-                DateTime.ParseExact(elem["created_at"].Value<string>(), gelbooruTimeFormat, CultureInfo.InvariantCulture),
-                elem["source"].Value<string>(),
-                elem["score"].Value<int>(),
-                elem["hash"].Value<string>()
-                );
+                DateTime.ParseExact(element.GetString("created_at"), gelbooruTimeFormat, CultureInfo.InvariantCulture),
+                element.GetString("source"),
+                element.GetInt32("score"),
+                element.GetString("hash"));
         }
 
-        private protected override Search.Post.SearchResult[] GetPostsSearchResult(object json)
+        private protected override Search.Post.SearchResult[] GetPostsSearchResult(in JsonElement element)
         {
-            return json is JArray array
-                ? array.Select(GetPostSearchResult).ToArray()
+            return element.ValueKind == JsonValueKind.Array && element.GetArrayLength() > 0
+                ? element.Select(e => GetPostSearchResult(e)).ToArray()
                 : Array.Empty<Search.Post.SearchResult>();
         }
 
@@ -99,27 +100,25 @@ namespace BooruSharp.Booru.Template
         {
             var elem = (XmlNode)json;
             XmlNode creatorId = elem.Attributes.GetNamedItem("creator_id");
+
             return new Search.Comment.SearchResult(
                 int.Parse(elem.Attributes.GetNamedItem("id").Value),
                 int.Parse(elem.Attributes.GetNamedItem("post_id").Value),
                 creatorId.InnerText.Length > 0 ? int.Parse(creatorId.Value) : (int?)null,
                 DateTime.ParseExact(elem.Attributes.GetNamedItem("created_at").Value, "yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture),
                 elem.Attributes.GetNamedItem("creator").Value,
-                elem.Attributes.GetNamedItem("body").Value
-                );
+                elem.Attributes.GetNamedItem("body").Value);
         }
 
         // GetWikiSearchResult not available
 
-        private protected override Search.Tag.SearchResult GetTagSearchResult(object json)
+        private protected override Search.Tag.SearchResult GetTagSearchResult(in JsonElement element)
         {
-            var elem = (JObject)json;
             return new Search.Tag.SearchResult(
-                elem["id"].Value<int>(),
-                elem["tag"].Value<string>(),
-                StringToTagType(elem["type"].Value<string>()),
-                elem["count"].Value<int>()
-                );
+                element.GetInt32("id").Value,
+                element.GetString("tag"),
+                StringToTagType(element.GetString("type")),
+                element.GetInt32("count").Value);
         }
 
         // GetRelatedSearchResult not available

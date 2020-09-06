@@ -1,6 +1,7 @@
-﻿using Newtonsoft.Json.Linq;
+﻿using BooruSharp.Extensions;
 using System;
 using System.Linq;
+using System.Text.Json;
 
 namespace BooruSharp.Booru.Template
 {
@@ -24,18 +25,28 @@ namespace BooruSharp.Booru.Template
                   | BooruOptions.NoTagByID | BooruOptions.NoPostByID | BooruOptions.NoPostCount | BooruOptions.NoFavorite)
         { }
 
-        private protected override JToken ParseFirstPostSearchResult(object json)
+        private protected override JsonElement ParseFirstPostSearchResult(in JsonElement element)
         {
-            JObject jObject = (JObject)json;
+            JsonElement? firstPost;
 
-            JToken token = jObject["posts"] is JArray posts
-                ? posts.FirstOrDefault()
-                : jObject["post"];
+            if (element.TryGetProperty("posts", out var posts)
+                && posts.ValueKind == JsonValueKind.Array)
+            {
+                firstPost = posts.GetArrayLength() > 0
+                    ? posts.EnumerateArray().First()
+                    : (JsonElement?)null;
+            }
+            else
+            {
+                firstPost = element.HasProperty("post")
+                    ? element.GetProperty("post")
+                    : (JsonElement?)null;
+            }
 
-            return token ?? throw new Search.InvalidTags();
+            return firstPost ?? throw new Search.InvalidTags();
         }
 
-        private protected override Search.Post.SearchResult GetPostSearchResult(JToken elem)
+        private protected override Search.Post.SearchResult GetPostSearchResult(in JsonElement element)
         {
             // TODO: Check others tags
             string[] categories =
@@ -48,60 +59,59 @@ namespace BooruSharp.Booru.Template
                 "meta",
             };
 
-            var fileToken = elem["file"];
-            var previewToken = elem["preview"];
+            // TODO FIXME ASAP
+            var tags = Array.Empty<string>();
 
-            string url = fileToken["url"].Value<string>();
-            string previewUrl = previewToken["url"].Value<string>();
-            int id = elem["id"].Value<int>();
-            string[] tags = categories
-                .SelectMany(category => elem["tags"][category].ToObject<string[]>())
-                .ToArray();
+            var fileElement = element.GetProperty("file");
+            var previewElement = element.GetProperty("preview");
+            int id = element.GetInt32("id").Value;
+            var sourcesElement = element.GetProperty("sources");
 
             return new Search.Post.SearchResult(
-                    url != null ? new Uri(url) : null,
-                    previewUrl != null ? new Uri(previewUrl) : null,
-                    new Uri(BaseUrl + "posts/" + id),
-                    GetRating(elem["rating"].Value<string>()[0]),
-                    tags,
-                    id,
-                    fileToken["size"].Value<int>(),
-                    fileToken["height"].Value<int>(),
-                    fileToken["width"].Value<int>(),
-                    previewToken["height"].Value<int>(),
-                    previewToken["width"].Value<int>(),
-                    elem["created_at"].Value<DateTime>(),
-                    elem["sources"].FirstOrDefault()?.Value<string>(),
-                    elem["score"]["total"].Value<int>(),
-                    fileToken["md5"].Value<string>()
-                );
+                fileElement.GetUri("url"),
+                previewElement.GetUri("url"),
+                new Uri(BaseUrl + "posts/" + id),
+                GetRating(element.GetString("rating")[0]),
+                tags,
+                id,
+                fileElement.GetInt32("size"),
+                fileElement.GetInt32("height").Value,
+                fileElement.GetInt32("width").Value,
+                previewElement.GetInt32("height"),
+                previewElement.GetInt32("width"),
+                element.GetDateTime("created_at"),
+                sourcesElement.EnumerateArray().FirstOrDefault().GetString(),
+                element.GetProperty("score").GetInt32("total"),
+                fileElement.GetString("md5"));
         }
 
-        private protected override Search.Post.SearchResult[] GetPostsSearchResult(object json)
+        private protected override Search.Post.SearchResult[] GetPostsSearchResult(in JsonElement element)
         {
-            JObject obj = (JObject)json;
+            var childElement = element.GetProperty("posts");
 
-            if (obj["posts"] is JArray array)
-                return array.Select(GetPostSearchResult).ToArray();
-            else if (obj["post"] is JToken token)
-                return new[] { GetPostSearchResult(token) };
-            else
-                return Array.Empty<Search.Post.SearchResult>();
+            if (element.TryGetProperty("posts", out childElement)
+                && childElement.ValueKind == JsonValueKind.Array
+                && childElement.GetArrayLength() > 0)
+                return childElement.Select(e => GetPostSearchResult(e)).ToArray();
+
+            if (element.TryGetProperty("post", out childElement)
+                && childElement.ValueKind == JsonValueKind.Object)
+                return new[] { GetPostSearchResult(childElement) };
+
+            return Array.Empty<Search.Post.SearchResult>();
         }
 
         // GetCommentSearchResult not available
 
         // GetWikiSearchResult not available
 
-        private protected override Search.Tag.SearchResult GetTagSearchResult(object json)
+        private protected override Search.Tag.SearchResult GetTagSearchResult(in JsonElement element)
         {
-            var elem = (JObject)json;
             return new Search.Tag.SearchResult(
-                elem["id"].Value<int>(),
-                elem["name"].Value<string>(),
-                (Search.Tag.TagType)elem["category"].Value<int>(),
-                elem["post_count"].Value<int>()
-                );
+                element.GetInt32("id").Value,
+                element.GetString("name"),
+                (Search.Tag.TagType)element.GetInt32("category").Value,
+                element.GetInt32("post_count").Value);
         }
 
         // GetRelatedSearchResult not available // TODO: Available with credentials?

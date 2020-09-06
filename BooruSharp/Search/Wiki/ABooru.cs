@@ -1,6 +1,6 @@
-﻿using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
+﻿using BooruSharp.Extensions;
 using System;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace BooruSharp.Booru
@@ -24,12 +24,16 @@ namespace BooruSharp.Booru
             if (query == null)
                 throw new ArgumentNullException(nameof(query));
 
-            var array = JsonConvert.DeserializeObject<JArray>(
-                await GetJsonAsync(CreateUrl(_wikiUrl, SearchArg(_format == UrlFormat.Danbooru ? "title" : "query") + query)));
+            var url = CreateUrl(_wikiUrl, SearchArg(_format == UrlFormat.Danbooru ? "title" : "query") + query);
 
-            foreach (var token in array)
-                if (token["title"].Value<string>() == query)
-                    return GetWikiSearchResult(token);
+            using (var content = await GetResponseContentAsync(url))
+            using (var stream = await content.ReadAsStreamAsync())
+            using (var document = await JsonDocument.ParseAsync(stream))
+            {
+                foreach (var element in document.RootElement.EnumerateArray())
+                    if (element.GetString("title") == query)
+                        return GetWikiSearchResult(element);
+            }
 
             throw new Search.InvalidTags();
         }
