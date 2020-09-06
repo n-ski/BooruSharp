@@ -223,20 +223,6 @@ namespace BooruSharp.Booru
 
         // TODO: Handle limitrate
 
-        [Obsolete]
-        private async Task<string> GetResponseStringAsync(string url)
-        {
-            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
-            HttpResponseMessage msg = await HttpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
-
-            if (msg.StatusCode == HttpStatusCode.Forbidden)
-                throw new AuthentificationRequired();
-
-            msg.EnsureSuccessStatusCode();
-
-            return await msg.Content.ReadAsStringAsync();
-        }
-
         private async Task<HttpContent> GetResponseContentAsync(string url)
         {
             ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
@@ -270,6 +256,21 @@ namespace BooruSharp.Booru
         private Task<XmlDocument> GetXmlAsync(Uri url)
         {
             return GetXmlAsync(url.AbsoluteUri);
+        }
+
+        private async Task<JsonElement> GetJsonAsync(string url)
+        {
+            using (var content = await GetResponseContentAsync(url))
+            using (var stream = await content.ReadAsStreamAsync())
+            using (var document = await JsonDocument.ParseAsync(stream))
+            {
+                return document.RootElement.Clone();
+            }
+        }
+
+        private Task<JsonElement> GetJsonAsync(Uri url)
+        {
+            return GetJsonAsync(url.AbsoluteUri);
         }
 
         private async Task<string> GetRandomIdAsync(string tags)

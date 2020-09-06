@@ -37,17 +37,14 @@ namespace BooruSharp.Booru
             }
             else
             {
-                using (var content = await GetResponseContentAsync(url))
-                using (var stream = await content.ReadAsStreamAsync())
-                using (var document = await JsonDocument.ParseAsync(stream))
-                {
-                    foreach (var element in document.RootElement.EnumerateArray())
-                    {
-                        var result = GetCommentSearchResult(element);
+                var element = await GetJsonAsync(url);
 
-                        if (result.PostID == postId)
-                            results.Add(result);
-                    }
+                foreach (var child in element.EnumerateArray())
+                {
+                    var result = GetCommentSearchResult(child);
+
+                    if (result.PostID == postId)
+                        results.Add(result);
                 }
             }
 
@@ -79,12 +76,8 @@ namespace BooruSharp.Booru
             }
             else
             {
-                using (var content = await GetResponseContentAsync(url))
-                using (var stream = await content.ReadAsStreamAsync())
-                using (var document = await JsonDocument.ParseAsync(stream))
-                {
-                    return document.RootElement.Select(e => GetCommentSearchResult(e)).ToArray();
-                }
+                var element = await GetJsonAsync(url);
+                return element.Select(e => GetCommentSearchResult(e)).ToArray();
             }
         }
     }

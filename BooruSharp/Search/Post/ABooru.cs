@@ -167,23 +167,12 @@ namespace BooruSharp.Booru
         public virtual async Task<Search.Post.SearchResult[]> GetLastPostsAsync(params string[] tagsArg)
         {
             var url = CreateUrl(_imageUrl, TagsToString(tagsArg));
-
-            using (var content = await GetResponseContentAsync(url))
-            using (var stream = await content.ReadAsStreamAsync())
-            using (var document = await JsonDocument.ParseAsync(stream))
-            {
-                return GetPostsSearchResult(document.RootElement);
-            }
+            return GetPostsSearchResult(await GetJsonAsync(url));
         }
 
         private async Task<Search.Post.SearchResult> GetSearchResultFromUrlAsync(string url)
         {
-            using (var content = await GetResponseContentAsync(url))
-            using (var stream = await content.ReadAsStreamAsync())
-            using (var document = await JsonDocument.ParseAsync(stream))
-            {
-                return GetPostSearchResult(ParseFirstPostSearchResult(document.RootElement));
-            }
+            return GetPostSearchResult(ParseFirstPostSearchResult(await GetJsonAsync(url)));
         }
 
         private Task<Search.Post.SearchResult> GetSearchResultFromUrlAsync(Uri url)
@@ -193,12 +182,7 @@ namespace BooruSharp.Booru
 
         private async Task<Search.Post.SearchResult[]> GetSearchResultsFromUrlAsync(string url)
         {
-            using (var content = await GetResponseContentAsync(url))
-            using (var stream = await content.ReadAsStreamAsync())
-            using (var document = await JsonDocument.ParseAsync(stream))
-            {
-                return GetPostsSearchResult(document.RootElement);
-            }
+            return GetPostsSearchResult(await GetJsonAsync(url));
         }
 
         private Task<Search.Post.SearchResult[]> GetSearchResultsFromUrlAsync(Uri url)

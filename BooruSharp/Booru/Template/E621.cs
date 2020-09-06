@@ -27,23 +27,14 @@ namespace BooruSharp.Booru.Template
 
         private protected override JsonElement ParseFirstPostSearchResult(in JsonElement element)
         {
-            JsonElement? firstPost;
-
             if (element.TryGetProperty("posts", out var posts)
                 && posts.ValueKind == JsonValueKind.Array)
-            {
-                firstPost = posts.GetArrayLength() > 0
-                    ? posts.EnumerateArray().First()
-                    : (JsonElement?)null;
-            }
-            else
-            {
-                firstPost = element.HasProperty("post")
-                    ? element.GetProperty("post")
-                    : (JsonElement?)null;
-            }
+                return posts.EnumerateArray().First();
 
-            return firstPost ?? throw new Search.InvalidTags();
+            if (element.TryGetProperty("post", out var post))
+                return post;
+
+            throw new Search.InvalidTags();
         }
 
         private protected override Search.Post.SearchResult GetPostSearchResult(in JsonElement element)

@@ -84,12 +84,8 @@ namespace BooruSharp.Booru
             }
             else
             {
-                using (var content = await GetResponseContentAsync(url))
-                using (var stream = await content.ReadAsStreamAsync())
-                using (var document = await JsonDocument.ParseAsync(stream))
-                {
-                    return document.RootElement.Select(e => GetTagSearchResult(e)).ToArray();
-                }
+                var element = await GetJsonAsync(url);
+                return element.Select(e => GetTagSearchResult(e)).ToArray();
             }
         }
 
@@ -103,7 +99,7 @@ namespace BooruSharp.Booru
 
             if (_format == UrlFormat.PostIndexJson)
                 urlTags.Add("limit=0");
-            
+
             var url = CreateUrl(_tagUrl, urlTags.ToArray());
             IEnumerable enumerable;
 
@@ -114,12 +110,8 @@ namespace BooruSharp.Booru
             }
             else
             {
-                using (var content = await GetResponseContentAsync(url))
-                using (var stream = await content.ReadAsStreamAsync())
-                using (var document = await JsonDocument.ParseAsync(stream))
-                {
-                    enumerable = document.RootElement.Clone().EnumerateArray();
-                }
+                var element = await GetJsonAsync(url);
+                enumerable = element.EnumerateArray();
             }
 
             foreach (object item in enumerable)

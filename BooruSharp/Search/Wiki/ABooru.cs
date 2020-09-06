@@ -25,15 +25,11 @@ namespace BooruSharp.Booru
                 throw new ArgumentNullException(nameof(query));
 
             var url = CreateUrl(_wikiUrl, SearchArg(_format == UrlFormat.Danbooru ? "title" : "query") + query);
+            var element = await GetJsonAsync(url);
 
-            using (var content = await GetResponseContentAsync(url))
-            using (var stream = await content.ReadAsStreamAsync())
-            using (var document = await JsonDocument.ParseAsync(stream))
-            {
-                foreach (var element in document.RootElement.EnumerateArray())
-                    if (element.GetString("title") == query)
-                        return GetWikiSearchResult(element);
-            }
+            foreach (var child in element.EnumerateArray())
+                if (child.GetString("title") == query)
+                    return GetWikiSearchResult(child);
 
             throw new Search.InvalidTags();
         }

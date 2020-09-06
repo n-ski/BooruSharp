@@ -26,17 +26,13 @@ namespace BooruSharp.Booru
 
             bool isDanbooruFormat = _format == UrlFormat.Danbooru;
             var url = CreateUrl(_relatedUrl, (isDanbooruFormat ? "query" : "tags") + "=" + tag);
+            var element = await GetJsonAsync(url);
 
-            using (var content = await GetResponseContentAsync(url))
-            using (var stream = await content.ReadAsStreamAsync())
-            using (var document = await JsonDocument.ParseAsync(stream))
-            {
-                var element = isDanbooruFormat
-                    ? document.RootElement.GetProperty("tags")
-                    : document.RootElement.GetProperty(document.RootElement.EnumerateObject().First().Name);
+            var tagElement = isDanbooruFormat
+                ? element.GetProperty("tags")
+                : element.GetProperty(element.EnumerateObject().First().Name);
 
-                return element.Select(e => GetRelatedSearchResult(e)).ToArray();
-            }
+            return tagElement.Select(e => GetRelatedSearchResult(e)).ToArray();
         }
     }
 }

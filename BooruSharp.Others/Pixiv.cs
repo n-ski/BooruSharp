@@ -79,15 +79,12 @@ namespace BooruSharp.Others
 
             response.EnsureSuccessStatusCode();
 
-            using (var stream = await response.Content.ReadAsStreamAsync())
-            using (var document = await JsonDocument.ParseAsync(stream))
-            {
-                var responseElement = document.RootElement.GetProperty("response");
+            var jsonElement = await ParseContentIntoJsonAsync(response.Content);
+            var responseElement = jsonElement.GetProperty("response");
 
-                AccessToken = responseElement.GetString("access_token");
-                RefreshToken = responseElement.GetString("refresh_token");
-                _refreshTime = DateTime.Now.AddSeconds(responseElement.GetInt32("expires_in").Value);
-            }
+            AccessToken = responseElement.GetString("access_token");
+            RefreshToken = responseElement.GetString("refresh_token");
+            _refreshTime = DateTime.Now.AddSeconds(responseElement.GetInt32("expires_in").Value);
         }
 
         /// <summary>
@@ -171,14 +168,11 @@ namespace BooruSharp.Others
 
             response.EnsureSuccessStatusCode();
 
-            using (var stream = await response.Content.ReadAsStreamAsync())
-            using (var document = await JsonDocument.ParseAsync(stream))
-            {
-                var responseElement = document.RootElement.GetProperty("response");
+            var jsonElement = await ParseContentIntoJsonAsync(response.Content);
+            var responseElement = jsonElement.GetProperty("response");
 
-                AccessToken = responseElement.GetString("access_token");
-                _refreshTime = DateTime.Now.AddSeconds(responseElement.GetInt32("expires_in").Value);
-            }
+            AccessToken = responseElement.GetString("access_token");
+            _refreshTime = DateTime.Now.AddSeconds(responseElement.GetInt32("expires_in").Value);
         }
 
         /// <inheritdoc/>
@@ -261,14 +255,8 @@ namespace BooruSharp.Others
 
             response.EnsureSuccessStatusCode();
 
-            //var jsonToken = JsonConvert.DeserializeObject<JToken>(await response.Content.ReadAsStringAsync());
-            //return ParseSearchResult(jsonToken["illust"]);
-
-            using (var stream = await response.Content.ReadAsStreamAsync())
-            using (var document = await JsonDocument.ParseAsync(stream))
-            {
-                return ParseSearchResult(document.RootElement.GetProperty("illust"));
-            }
+            var jsonElement = await ParseContentIntoJsonAsync(response.Content);
+            return ParseSearchResult(jsonElement.GetProperty("illust"));
         }
 
         /// <inheritdoc/>
@@ -294,12 +282,9 @@ namespace BooruSharp.Others
 
             response.EnsureSuccessStatusCode();
 
-            using (var stream = await response.Content.ReadAsStreamAsync())
-            using (var document = await JsonDocument.ParseAsync(stream))
-            {
-                var element = document.RootElement.GetProperty("illusts");
-                return ParseSearchResult(element.EnumerateArray().First());
-            }
+            var jsonElement = await ParseContentIntoJsonAsync(response.Content);
+            var illustsElement = jsonElement.GetProperty("illusts");
+            return ParseSearchResult(illustsElement.EnumerateArray().First());
 
         }
 
@@ -324,14 +309,12 @@ namespace BooruSharp.Others
 
             response.EnsureSuccessStatusCode();
 
-            using (var stream = await response.Content.ReadAsStreamAsync())
-            using (var document = await JsonDocument.ParseAsync(stream))
-            {
-                return document.RootElement
-                    .GetProperty("body")
-                    .GetProperty("illustManga")
-                    .GetInt32("total").Value;
-            }
+            var jsonElement = await ParseContentIntoJsonAsync(response.Content);
+
+            return jsonElement
+                .GetProperty("body")
+                .GetProperty("illustManga")
+                .GetInt32("total").Value;
         }
 
         /// <inheritdoc/>
@@ -360,11 +343,9 @@ namespace BooruSharp.Others
 
             response.EnsureSuccessStatusCode();
 
-            using (var stream = await response.Content.ReadAsStreamAsync())
-            using (var document = await JsonDocument.ParseAsync(stream))
-            {
-                return ParseSearchResults(document.RootElement);
-            }
+            var jsonElement = await ParseContentIntoJsonAsync(response.Content);
+
+            return ParseSearchResults(jsonElement);
         }
 
         private static string JoinTagsAndEscapeString(string[] tags)
@@ -428,6 +409,15 @@ namespace BooruSharp.Others
                 null,
                 post.GetInt32("total_bookmarks"),
                 null);
+        }
+
+        private static async Task<JsonElement> ParseContentIntoJsonAsync(HttpContent content)
+        {
+            using (var stream = await content.ReadAsStreamAsync())
+            using (var document = await JsonDocument.ParseAsync(stream))
+            {
+                return document.RootElement.Clone();
+            }
         }
 
         private void AddAuthorizationHeader(HttpRequestMessage request)
