@@ -97,7 +97,7 @@ namespace BooruSharp.Booru.Template
 
             return new Search.Related.SearchResult(
                 childElements[0].GetString(),
-                childElements[1].GetInt32());
+                int.Parse(childElements[1].GetString()));
         }
     }
 }

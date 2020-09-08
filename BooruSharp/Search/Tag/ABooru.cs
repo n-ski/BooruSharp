@@ -110,18 +110,15 @@ namespace BooruSharp.Booru
             }
             else
             {
-                var element = await GetJsonAsync(url);
-                enumerable = element.EnumerateArray();
+                var json = await GetJsonAsync(url);
+                enumerable = json.EnumerateArray();
             }
 
-            foreach (object item in enumerable)
+            foreach (object obj in enumerable)
             {
-                Search.Tag.SearchResult result;
-
-                if (item is JsonElement jsonElement)
-                    result = GetTagSearchResult(jsonElement);
-                else
-                    result = GetTagSearchResult(item);
+                var result = obj is JsonElement jsonElement
+                    ? GetTagSearchResult(jsonElement)
+                    : GetTagSearchResult(obj);
 
                 if ((name == null && id == result.ID) || (name != null && name == result.Name))
                     return result;

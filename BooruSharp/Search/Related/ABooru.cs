@@ -30,7 +30,7 @@ namespace BooruSharp.Booru
 
             var tagElement = isDanbooruFormat
                 ? element.GetProperty("tags")
-                : element.GetProperty(element.EnumerateObject().First().Name);
+                : element.EnumerateObject().First().Value;
 
             return tagElement.Select(e => GetRelatedSearchResult(e)).ToArray();
         }

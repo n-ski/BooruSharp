@@ -29,7 +29,7 @@ namespace BooruSharp.Booru.Template
         {
             switch (element.ValueKind)
             {
-                case JsonValueKind.Array:
+                case JsonValueKind.Array when element.GetArrayLength() > 0:
                     return element.EnumerateArray().First();
 
                 case JsonValueKind.Object:
@@ -42,7 +42,7 @@ namespace BooruSharp.Booru.Template
 
         private protected override Search.Post.SearchResult GetPostSearchResult(in JsonElement element)
         {
-            var id = element.GetInt32("id").Value;
+            var id = element.GetInt32("id") ?? 0;
 
             return new Search.Post.SearchResult(
                 element.GetUri("file_url"),

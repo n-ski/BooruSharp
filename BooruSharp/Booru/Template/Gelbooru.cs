@@ -74,7 +74,7 @@ namespace BooruSharp.Booru.Template
             return new Search.Post.SearchResult(
                 element.GetUri("file_url"),
                 new Uri("https://gelbooru.com/thumbnails/" + directory + "/thumbnail_" + image),
-                new Uri(BaseUrl + "/index.php?page=post&s=view&id=" + id),
+                new Uri(BaseUrl + "index.php?page=post&s=view&id=" + id),
                 GetRating(element.GetString("rating")[0]),
                 element.GetString("tags").Split(' '),
                 id,

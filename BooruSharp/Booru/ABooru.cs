@@ -243,10 +243,10 @@ namespace BooruSharp.Booru
 
         private async Task<XmlDocument> GetXmlAsync(string url)
         {
-            using (var response = await GetResponseContentAsync(url))
+            using (var content = await GetResponseContentAsync(url))
             {
                 var xmlDoc = new XmlDocument();
-                var xmlString = await response.ReadAsStringAsync();
+                var xmlString = await content.ReadAsStringAsync();
                 xmlDoc.LoadXml(XmlEntity.ReplaceAll(xmlString));
 
                 return xmlDoc;
@@ -261,10 +261,20 @@ namespace BooruSharp.Booru
         private async Task<JsonElement> GetJsonAsync(string url)
         {
             using (var content = await GetResponseContentAsync(url))
-            using (var stream = await content.ReadAsStreamAsync())
-            using (var document = await JsonDocument.ParseAsync(stream))
             {
-                return document.RootElement.Clone();
+                var jsonString = await content.ReadAsStringAsync();
+
+                // Gelbooru is notorious for returning empty strings,
+                // so we have to opt in for a less fast method of reading
+                // the response string first instead of passing the
+                // response stream directly to JsonDocument.
+                if (string.IsNullOrWhiteSpace(jsonString))
+                    jsonString = "{}";
+
+                using (var document = JsonDocument.Parse(jsonString))
+                {
+                    return document.RootElement.Clone();
+                }
             }
         }
 

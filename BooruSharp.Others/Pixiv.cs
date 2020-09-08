@@ -345,7 +345,7 @@ namespace BooruSharp.Others
 
             var jsonElement = await ParseContentIntoJsonAsync(response.Content);
 
-            return ParseSearchResults(jsonElement);
+            return ParseSearchResults(jsonElement.GetProperty("illusts"));
         }
 
         private static string JoinTagsAndEscapeString(string[] tags)

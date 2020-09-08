@@ -28,7 +28,8 @@ namespace BooruSharp.Booru.Template
         private protected override JsonElement ParseFirstPostSearchResult(in JsonElement element)
         {
             if (element.TryGetProperty("posts", out var posts)
-                && posts.ValueKind == JsonValueKind.Array)
+                && posts.ValueKind == JsonValueKind.Array
+                && posts.GetArrayLength() > 0)
                 return posts.EnumerateArray().First();
 
             if (element.TryGetProperty("post", out var post))
@@ -39,19 +40,14 @@ namespace BooruSharp.Booru.Template
 
         private protected override Search.Post.SearchResult GetPostSearchResult(in JsonElement element)
         {
-            // TODO: Check others tags
-            string[] categories =
+            // Enumerate all subproperties ("general", "species", etc) of
+            // the "tags" property, and extract tag strings from them.
+            var tags = element.GetProperty("tags").EnumerateObject().SelectMany(property =>
             {
-                "general",
-                "species",
-                "character",
-                "copyright",
-                "artist",
-                "meta",
-            };
-
-            // TODO FIXME ASAP
-            var tags = Array.Empty<string>();
+                return property.Value.GetArrayLength() > 0
+                    ? property.Value.Select(e => e.GetString())
+                    : Array.Empty<string>();
+            }).ToArray();
 
             var fileElement = element.GetProperty("file");
             var previewElement = element.GetProperty("preview");
@@ -71,7 +67,9 @@ namespace BooruSharp.Booru.Template
                 previewElement.GetInt32("height"),
                 previewElement.GetInt32("width"),
                 element.GetDateTime("created_at"),
-                sourcesElement.EnumerateArray().FirstOrDefault().GetString(),
+                sourcesElement.GetArrayLength() > 0 
+                    ? sourcesElement.EnumerateArray().First().GetString()
+                    : "",
                 element.GetProperty("score").GetInt32("total"),
                 fileElement.GetString("md5"));
         }
