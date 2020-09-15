@@ -8,6 +8,12 @@ namespace BooruSharp.Booru
     // TODO: add variants that return Stream objects.
     public abstract partial class ABooru
     {
+        // Allow this many files to be downloaded at once.
+        // DO NOT change this to a constant field, this was intentionally made a property.
+        // TODO: we should probably also consider images that are currenly being downloaded
+        // by DownloadPreviewImageBytesAsync and DownloadOriginalImageBytesAsync.
+        private protected virtual int SimultaneousImageDownloadLimit => 4;
+
         /// <summary>
         /// Downloads the <paramref name="post"/>'s preview image as an array of bytes.
         /// </summary>
@@ -36,6 +42,11 @@ namespace BooruSharp.Booru
         /// <param name="post">The post to get the image from.</param>
         /// <returns>The task object representing the asynchronous operation.</returns>
         /// <exception cref="HttpRequestException"/>
+        // TODO: this should probably return an array of tasks instead. Returning an array of tasks
+        // will let us attach continuations to the tasks from the calling method, making saving files
+        // much more efficient since we won't have to wait until all of the tasks complete before
+        // we can start copying bytes to files. Maybe an overload with custom continuation function
+        // should be provided just for that. IAsyncEnumerable when?
         public virtual Task<byte[][]> DownloadAllImagesAsync(Search.Post.SearchResult post)
         {
             // I'm not sure if this should return an array with one element by default.

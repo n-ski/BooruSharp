@@ -301,6 +301,73 @@ namespace BooruSharp.Others
             }
         }
 
+        /// <inheritdoc/>
+        /// <exception cref="AuthentificationInvalid"/>
+        /// <exception cref="AuthentificationRequired"/>
+        public override async Task<byte[][]> DownloadAllImagesAsync(SearchResult post)
+        {
+            await CheckUpdateTokenAsync();
+
+            // Since there's no way to know if the passed SearchResult value
+            // contains multiple images, we have to request raw JSON again.
+            var request = new HttpRequestMessage(HttpMethod.Get, BaseUrl + "v1/illust/detail?illust_id=" + post.ID);
+            AddAuthorizationHeader(request);
+
+            JToken illustToken;
+
+            using (var response = await GetResponseAsync(request))
+            {
+                if (response.StatusCode == HttpStatusCode.NotFound)
+                    throw new InvalidPostId();
+
+                response.EnsureSuccessStatusCode();
+
+                var jsonToken = await GetJsonAsync<JToken>(response.Content);
+                illustToken = jsonToken["illust"];
+            }
+
+            // The number of images contained in the post.
+            int imagesCount = illustToken["page_count"].Value<int>();
+
+            // Parsing the whole thing here is probably overkill.
+            var postUrl = ParseSearchResult(illustToken).PostUrl;
+
+            if (imagesCount > 1)
+            {
+                using (var taskSemaphore = new SemaphoreSlim(SimultaneousImageDownloadLimit))
+                {
+                    // This will create one task for each image. The semaphore above
+                    // limits the number of simultaneous tasks, so we won't create
+                    // 100 tasks for 100 images immediately, new tasks will be
+                    // created as old tasks complete.
+                    var tasks = illustToken["meta_pages"].Select(metaToken =>
+                    {
+                        taskSemaphore.Wait();
+
+                        return Task.Run(async () =>
+                        {
+                            try
+                            {
+                                var imageUrl = new Uri(metaToken["image_urls"]["original"].Value<string>());
+                                return await DownloadBytesFromUrlWithReferer(imageUrl, postUrl);
+                            }
+                            finally
+                            {
+                                taskSemaphore.Release();
+                            }
+                        });
+                    });
+
+                    return await Task.WhenAll(tasks);
+                }
+            }
+            else
+            {
+                var imageUrl = new Uri(illustToken["meta_single_page"]["original_image_url"].Value<string>());
+                return new[] { await DownloadBytesFromUrlWithReferer(imageUrl, postUrl) };
+            }
+        }
+
         // Make sure to call and await CheckUpdateTokenAsync
         // first before calling this method.
         private void AddAuthorizationHeader(HttpRequestMessage request)
