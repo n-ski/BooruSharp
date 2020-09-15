@@ -27,7 +27,7 @@ namespace BooruSharp.Others
         public Pixiv()
             : base("app-api.pixiv.net", UrlFormat.None, BooruOptions.NoComment | BooruOptions.NoLastComments
                   | BooruOptions.NoMultipleRandom | BooruOptions.NoPostByMD5 | BooruOptions.NoRelated | BooruOptions.NoTagByID
-                  | BooruOptions.NoWiki | BooruOptions.NoEmptyPostSearch)
+                  | BooruOptions.NoWiki | BooruOptions.NoEmptyPostSearch | BooruOptions.PostMultipleOriginalImages)
         {
             AccessToken = null;
         }
@@ -115,44 +115,6 @@ namespace BooruSharp.Others
                 });
 
             return SendLoginRequestAsync(request);
-        }
-
-        /// <summary>
-        /// Downloads the <paramref name="result"/>'s image as an array of bytes.
-        /// </summary>
-        /// <param name="result">The post to get the image from.</param>
-        /// <returns>The task object representing the asynchronous operation.</returns>
-        /// <exception cref="HttpRequestException"/>
-        public async Task<byte[]> ImageToByteArrayAsync(SearchResult result)
-        {
-            var request = new HttpRequestMessage(HttpMethod.Get, result.FileUrl);
-            request.Headers.Add("Referer", result.PostUrl.AbsoluteUri);
-
-            using (var response = await GetResponseAsync(request))
-            {
-                response.EnsureSuccessStatusCode();
-
-                return await response.Content.ReadAsByteArrayAsync();
-            }
-        }
-
-        /// <summary>
-        /// Downloads the <paramref name="result"/>'s preview image as an array of bytes.
-        /// </summary>
-        /// <param name="result">The post to get the preview image from.</param>
-        /// <returns>The task object representing the asynchronous operation.</returns>
-        /// <exception cref="HttpRequestException"/>
-        public async Task<byte[]> PreviewToByteArrayAsync(SearchResult result)
-        {
-            var request = new HttpRequestMessage(HttpMethod.Get, result.PreviewUrl);
-            request.Headers.Add("Referer", result.PostUrl.AbsoluteUri);
-
-            using (var response = await GetResponseAsync(request))
-            {
-                response.EnsureSuccessStatusCode();
-
-                return await response.Content.ReadAsByteArrayAsync();
-            }
         }
 
         /// <summary>

@@ -78,5 +78,9 @@ namespace BooruSharp.Booru
         /// Indicates that search parameter must be provided in order for post search functions to work.
         /// </summary>
         NoEmptyPostSearch = 1 << 15,
+        /// <summary>
+        /// Indicates that posts on this booru may contain more than one original image.
+        /// </summary>
+        PostMultipleOriginalImages = 1 << 16,
     }
 }

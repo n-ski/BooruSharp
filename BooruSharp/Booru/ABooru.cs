@@ -118,6 +118,11 @@ namespace BooruSharp.Booru
         public bool NoEmptyPostSearch => _options.HasFlag(BooruOptions.NoEmptyPostSearch);
 
         /// <summary>
+        /// Gets a value indicating whether the posts on this booru may contain more than one original image.
+        /// </summary>
+        public bool PostsHaveMultipleImages => _options.HasFlag(BooruOptions.PostMultipleOriginalImages);
+
+        /// <summary>
         /// Gets a value indicating whether http:// scheme is used instead of https://.
         /// </summary>
         protected bool UsesHttp => _options.HasFlag(BooruOptions.UseHttp);
